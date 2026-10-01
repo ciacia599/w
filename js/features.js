@@ -140,9 +140,15 @@ const Features = (() => {
     const grab = overlay.querySelector('#rp-grab');
     if (grab) {
       grab.addEventListener('click', () => {
+        const single = +(msg.amount / msg.count).toFixed(2);
         msg.remaining = Math.max(0, msg.remaining - 1);
         Core.State.save();
-        Core.Toast.show(`领取成功 ¥${(msg.amount / msg.count).toFixed(2)}`, 'success');
+        // 领取加金币（¥1 = 10金币）
+        const gold = Math.round(single * 10);
+        const w = Core.State.data.wallet || (Core.State.data.wallet = { coins: 0 });
+        w.coins += gold;
+        Core.State.save();
+        Core.Toast.show(`领取成功 ¥${single}（+${gold} 金币）`, 'success');
         UI.renderMessages(Core.State.currentChatId);
         close();
       });

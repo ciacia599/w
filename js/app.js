@@ -109,6 +109,7 @@
     const iconColor = 'color:var(--c-accent-deep)';
 
     const spaces = [
+      { key:'moments',name:'朋友圈', icon:'fa-camera-retro', preview:(typeof Features9 !== 'undefined' && Features9.momentUnread ? Features9.momentUnread() : 0) + ' 条新动态' },
       { key:'diary',  name:'日记', icon:'fa-book', preview:`${d.diaries?.length||0} 篇日记` },
       { key:'letter', name:'信件', icon:'fa-envelope', preview:`${d.letters?.length||0} 封信` },
       { key:'books',  name:'书库', icon:'fa-book-open', preview:`${d.books?.length||0} 本书` },
@@ -135,6 +136,7 @@
 
     // 通用绑定：优先调用对应 Features 的 open 函数，其次回退到点击原按钮
     const binds = {
+      moments:  () => { if (typeof Features9 !== 'undefined' && Features9.openMoments) Features9.openMoments(); else Core.Toast.show('功能加载中…','error'); },
       diary:    () => { try { document.getElementById('btn-diary').click(); } catch(e) {} },
       letter:   () => { try { document.getElementById('btn-letter').click(); } catch(e) {} },
       books:    () => { try { document.getElementById('btn-read').click(); } catch(e) {} },

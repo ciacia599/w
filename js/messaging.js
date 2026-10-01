@@ -91,7 +91,7 @@ const Messaging = (() => {
 
   /* 模拟对方回复（演示用） */
   function simulateReply(sid, peer) {
-    const delay = 500 + (Core.Probability.get().replyDelay / 100) * 2500;
+    const delay = Core.Probability.replyDelayMs();
     const showTyping = Core.Probability.roll('typingShow');
 
     if (showTyping) {

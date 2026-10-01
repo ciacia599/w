@@ -270,7 +270,8 @@ const Core = (() => {
     defaults: {
       autoReply: 70,      // 自动回复概率 %
       typingShow: 80,     // 显示对方正在输入概率
-      replyDelay: 50,     // 回复延迟 0-100 (映射到 0.5-3s)
+      replyDelay: 50,     // 回复延迟 0-100 (未自定义区间时映射到 0.5-3s)
+      replyRange: null,   // 自定义回复秒数区间 {min, max}，null 时用 replyDelay 滑块
       emojiUse: 40,       // 自动回复中使用表情概率
       activeStatus: 90,   // 显示在线状态概率
       readReceipt: 100    // 已读回执概率
@@ -279,7 +280,17 @@ const Core = (() => {
     set(k, v) {
       const p = this.get(); p[k] = v; store.set(KEYS.PROB, p);
     },
-    roll(k) { return Math.random() * 100 < this.get()[k]; }
+    roll(k) { return Math.random() * 100 < this.get()[k]; },
+    /* 本次回复延迟（毫秒）：自定义区间优先，区间内随机 */
+    replyDelayMs() {
+      const p = this.get();
+      if (p.replyRange && typeof p.replyRange.min === 'number') {
+        const { min, max } = p.replyRange;
+        const lo = Math.min(min, max) * 1000, hi = Math.max(min, max) * 1000;
+        return Math.round(lo + Math.random() * (hi - lo));
+      }
+      return 500 + (p.replyDelay / 100) * 2500;
+    }
   };
 
   /* ---- Toast ---- */

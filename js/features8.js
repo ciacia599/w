@@ -334,22 +334,17 @@ const Features8 = (() => {
     const today = new Date(); today.setHours(0,0,0,0);
     const [y, m, d] = a.date.split('-').map(Number);
     const target = new Date(y, m - 1, d); target.setHours(0,0,0,0);
-    if (a.annual) {
-      const thisYear = new Date(today.getFullYear(), m - 1, d);
-      if (a.type === 'countup') {
-        // 今年纪念日若还没到，取去年；到了或过了取今年
-        if (thisYear > today) thisYear.setFullYear(today.getFullYear() - 1);
-        return { days: Math.floor((today - thisYear) / 86400000), label: '已过' };
-      } else {
-        let next = new Date(today.getFullYear(), m - 1, d);
-        if (next < today) next.setFullYear(today.getFullYear() + 1);
-        return { days: Math.floor((next - today) / 86400000), label: '还有' };
-      }
-    } else {
+    if (a.type === 'countup') {
+      // 累计：从起始日期到今天总天数（与是否每年无关）
       const diff = Math.floor((today - target) / 86400000);
-      if (a.type === 'countup') return { days: Math.abs(diff), label: '已过' };
-      if (diff >= 0) return { days: diff, label: '已过' };
-      return { days: Math.abs(diff), label: '还有' };
+      return { days: Math.max(0, diff), label: '已过' };
+    } else {
+      // 倒计时：距离目标日期还有几天（可勾选每年重复）
+      let next = new Date(today.getFullYear(), m - 1, d);
+      if (a.annual && next < today) next.setFullYear(today.getFullYear() + 1);
+      if (!a.annual && next < today) next = target; // 非每年且已过，仍显示已过天数
+      const diff = Math.floor((next - today) / 86400000);
+      return { days: Math.max(0, diff), label: diff >= 0 ? '还有' : '已过' };
     }
   }
 
@@ -447,8 +442,8 @@ const Features8 = (() => {
           <button type="button" class="f2-chip selectable ${a.type === 'countup' ? 'selected' : ''}" data-ant="countup">📅 累计天数（从这天开始算起）</button>
           <button type="button" class="f2-chip selectable ${a.type !== 'countup' ? 'selected' : ''}" data-ant="countdown">⏳ 倒计时（距离这天还有几天）</button>
         </div>
-        <label class="f2-label">是否每年重复</label>
-        <div class="f2-chip-row">
+        <label class="f2-label" id="an-annual-label">是否每年重复</label>
+        <div class="f2-chip-row" id="an-annual-row">
           <button type="button" class="f2-chip selectable ${a.annual ? 'selected' : ''}" data-anr="1">是</button>
           <button type="button" class="f2-chip selectable ${!a.annual ? 'selected' : ''}" data-anr="0">否</button>
         </div>
@@ -460,10 +455,19 @@ const Features8 = (() => {
     let type = a.type || 'countup';
     let annual = !!a.annual;
     em.overlay.querySelector('[data-close]').addEventListener('click', em.close);
+    function syncAnnualVisible() {
+      const show = type !== 'countup';
+      const label = em.overlay.querySelector('#an-annual-label');
+      const row = em.overlay.querySelector('#an-annual-row');
+      if (label) label.style.display = show ? '' : 'none';
+      if (row) row.style.display = show ? '' : 'none';
+    }
     em.overlay.querySelectorAll('[data-ant]').forEach(b => b.addEventListener('click', () => {
       type = b.dataset.ant;
       em.overlay.querySelectorAll('[data-ant]').forEach(x => x.classList.toggle('selected', x === b));
+      syncAnnualVisible();
     }));
+    syncAnnualVisible();
     em.overlay.querySelectorAll('[data-anr]').forEach(b => b.addEventListener('click', () => {
       annual = b.dataset.anr === '1';
       em.overlay.querySelectorAll('[data-anr]').forEach(x => x.classList.toggle('selected', x === b));
@@ -500,6 +504,18 @@ const Features8 = (() => {
   function pomoPhrases(d, scene) {
     const list = d.pomodoro.phrases.filter(p => !p.scene || p.scene === scene);
     return list.length ? list : d.pomodoro.phrases;
+  }
+  function updatePomoToday(page) {
+    const d = ensureData();
+    pomoEnsure(d);
+    const today = new Date().toDateString();
+    const recs = (d.pomodoro.history || []).filter(h => new Date(h.t).toDateString() === today);
+    const el = page?.querySelector('#pomo-today');
+    if (!el) return;
+    if (!recs.length) { el.textContent = '暂无记录'; return; }
+    const focus = recs.filter(r => r.phase === 'focus').reduce((s, r) => s + r.min, 0);
+    const breakM = recs.filter(r => r.phase === 'break').reduce((s, r) => s + r.min, 0);
+    el.innerHTML = `专注 <b>${focus}</b> 分钟 · 休息 <b>${breakM}</b> 分钟 · 共 <b>${recs.length}</b> 次`;
   }
 
   function openPomodoro() {
@@ -631,17 +647,6 @@ const Features8 = (() => {
         page.querySelector('#pomo-stop')?.addEventListener('click', () => stopPomodoro(true));
       }
       updatePomoToday(page);
-    }
-
-    function updatePomoToday(page) {
-      const today = new Date().toDateString();
-      const recs = (d.pomodoro.history || []).filter(h => new Date(h.t).toDateString() === today);
-      const el = page.querySelector('#pomo-today');
-      if (!el) return;
-      if (!recs.length) { el.textContent = '暂无记录'; return; }
-      const focus = recs.filter(r => r.phase === 'focus').reduce((s, r) => s + r.min, 0);
-      const breakM = recs.filter(r => r.phase === 'break').reduce((s, r) => s + r.min, 0);
-      el.innerHTML = `专注 <b>${focus}</b> 分钟 · 休息 <b>${breakM}</b> 分钟 · 共 <b>${recs.length}</b> 次`;
     }
 
     /* ---- 陪伴模式页面 ---- */

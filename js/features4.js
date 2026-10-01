@@ -12,10 +12,14 @@ const Features4 = (() => {
       invListen: 'leisure', invWatch: 'leisure', invRead: 'off',
       invGame: 'leisure', invAsk: 'leisure', invCheckin: 'off',
       orderFood: 'off', propAvatar: 'off', propNickname: 'off', mediaCtl: 'off',
-      msg: 'normal', invPomo: 'off'
+      msg: 'normal', invPomo: 'off', moment: 'leisure', momentReact: 'normal',
+      peerFish: 'off', peerCheckin: 'off', redEnvelope: 'off', peerVideo: 'off'
     };
     d.peerFreq = Object.assign({}, pfDefaults, d.peerFreq || {});
     d.peerMsgCount = d.peerMsgCount || { min: 1, max: 3 }; // 每次主动发消息条数
+    d.peerQuestions = d.peerQuestions || []; // 用户自定义问题库（TA 主动提问从这里挑）
+    d.peerFishPool = d.peerFishPool || { doings: [], moods: [] };   // TA主动摸鱼内容库
+    d.peerCheckinPool = d.peerCheckinPool || { places: [], doings: [], moods: [] }; // TA主动查岗内容库
     d.drawings = d.drawings || [];
     initShiftData(d);
     return d;
@@ -992,7 +996,7 @@ const Features4 = (() => {
     { k: 'diary', icon: 'fa-book', name: '对方写日记', desc: 'TA会主动写日记分享给你（内容取自你的日记卡）' },
     { k: 'letter', icon: 'fa-envelope', name: '对方写信', desc: 'TA会主动给你写信（内容取自你的写信卡，存入信件箱）' },
     { k: 'note', icon: 'fa-note-sticky', name: '对方留言', desc: 'TA会主动给你留言（内容取自你的留言卡，存入留言箱）' },
-    { k: 'question', icon: 'fa-question-circle', name: '对方提问', desc: 'TA会主动问你问题' },
+    { k: 'question', icon: 'fa-question-circle', name: '对方提问', desc: 'TA会主动问你问题（从你自定义的问题库里挑选）' },
     { k: 'drawing', icon: 'fa-paintbrush', name: '对方画画', desc: 'TA会主动画涂鸦发给你' },
     { k: 'invListen', icon: 'fa-music', name: '邀请听歌', desc: 'TA主动邀请你一起听歌' },
     { k: 'invWatch', icon: 'fa-film', name: '邀请观影', desc: 'TA主动邀请你一起看视频' },
@@ -1005,7 +1009,13 @@ const Features4 = (() => {
     { k: 'propNickname', icon: 'fa-signature', name: '提议换昵称', desc: 'TA从你的昵称库挑昵称提议给你换，与头像分开' },
     { k: 'mediaCtl', icon: 'fa-sliders', name: '媒体同步互动', desc: '一起听歌/观影/读书面板打开时，TA发消息并控制播放/翻页' },
     { k: 'msg', icon: 'fa-comment-dots', name: '主动发消息', desc: 'TA在回复你时额外主动发1~N条消息（条数可在下方设置）' },
-    { k: 'invPomo', icon: 'fa-stopwatch', name: '邀请陪伴', desc: 'TA主动邀请你开启番茄钟陪伴模式，你可同意/拒绝' }
+    { k: 'invPomo', icon: 'fa-stopwatch', name: '邀请陪伴', desc: 'TA主动邀请你开启番茄钟陪伴模式，你可同意/拒绝' },
+    { k: 'moment', icon: 'fa-camera-retro', name: '发朋友圈', desc: 'TA主动发布朋友圈动态' },
+    { k: 'momentReact', icon: 'fa-heart', name: '互动我的朋友圈', desc: 'TA回复你时去赞/评论你最新的一条朋友圈' },
+    { k: 'peerFish', icon: 'fa-fish', name: '对方摸鱼小计', desc: 'TA主动向你分享TA的摸鱼状态（从你的自定义内容库挑选）' },
+    { k: 'peerCheckin', icon: 'fa-street-view', name: '对方主动查岗', desc: 'TA主动向你打卡TA此刻的位置和状态（从你的自定义内容库挑选）' },
+    { k: 'redEnvelope', icon: 'fa-gift', name: '对方发红包', desc: 'TA主动给你发红包，金额随机' },
+    { k: 'peerVideo', icon: 'fa-video', name: '对方视频通话', desc: 'TA主动发起视频通话邀请，你可同意/拒绝' }
   ];
 
   function openPeerFreq() {
@@ -1031,6 +1041,36 @@ const Features4 = (() => {
             <span>条</span>
             <button class="btn-primary" id="pf-count-save" style="margin-left:auto;padding:6px 14px;font-size:13px">保存</button>
           </div>
+        </div>
+        <div class="f2-item" style="margin-top:10px;flex-direction:column;align-items:stretch;border-top:1px dashed var(--c-border);padding-top:14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="f2-item-mood"><i class="fas fa-question-circle"></i></span>
+            <div class="f2-item-main" style="flex:1">
+              <div class="f2-item-text">我的提问库（${(d.peerQuestions || []).length} 条）</div>
+              <div class="f2-item-sub">「对方提问」开启后，TA 会从这里随机挑一条问你</div>
+            </div>
+            <button class="btn-ghost" id="pf-qbank" style="padding:6px 14px;font-size:13px"><i class="fas fa-pen"></i> 管理</button>
+          </div>
+        </div>
+        <div class="f2-item" style="margin-top:10px;flex-direction:column;align-items:stretch;border-top:1px dashed var(--c-border);padding-top:14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="f2-item-mood"><i class="fas fa-fish"></i></span>
+            <div class="f2-item-main" style="flex:1">
+              <div class="f2-item-text">摸鱼内容库（正在做 ${(d.peerFishPool?.doings || []).length} 条 · 心情 ${(d.peerFishPool?.moods || []).length} 条）</div>
+              <div class="f2-item-sub">「对方摸鱼小计」开启后，TA 分享的内容只从这两个库里挑</div>
+            </div>
+            <button class="btn-ghost" id="pf-fishbank" style="padding:6px 14px;font-size:13px"><i class="fas fa-pen"></i> 管理</button>
+          </div>
+        </div>
+        <div class="f2-item" style="margin-top:10px;flex-direction:column;align-items:stretch;border-top:1px dashed var(--c-border);padding-top:14px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="f2-item-mood"><i class="fas fa-street-view"></i></span>
+            <div class="f2-item-main" style="flex:1">
+              <div class="f2-item-text">查岗内容库（地点 ${(d.peerCheckinPool?.places || []).length} · 在做 ${(d.peerCheckinPool?.doings || []).length} · 心情 ${(d.peerCheckinPool?.moods || []).length}）</div>
+              <div class="f2-item-sub">「对方主动查岗」开启后，TA 的打卡内容只从这三个库里挑</div>
+            </div>
+            <button class="btn-ghost" id="pf-cibank" style="padding:6px 14px;font-size:13px"><i class="fas fa-pen"></i> 管理</button>
+          </div>
         </div>`,
       footer: `<button class="btn-ghost" data-close>关闭</button>`,
       size: 'modal-lg'
@@ -1046,6 +1086,124 @@ const Features4 = (() => {
       overlay.querySelector('#pf-max').value = d.peerMsgCount.max;
       Core.Toast.show('条数设置已保存', 'success');
     });
+
+    /* ---- 提问库管理 ---- */
+    overlay.querySelector('#pf-qbank').addEventListener('click', () => {
+      const { overlay: qo, close: qc } = UI.modal({
+        title: '❓ 我的提问库',
+        body: `
+          <p style="font-size:12px;color:var(--c-text-soft);margin-bottom:10px">添加你希望 TA 问你的问题。「对方提问」频率开启后，TA 会从这里随机挑一条发给你。可以一次添加多条（每行一条）。</p>
+          <textarea id="qb-input" class="f2-textarea" rows="4" maxlength="500" placeholder="每行一条问题，如：今天想我了吗？"></textarea>
+          <button class="btn-primary" id="qb-add" style="width:100%;margin-top:8px"><i class="fas fa-plus"></i> 添加到问题库</button>
+          <div class="f2-divider"></div>
+          <div class="f2-list" id="qb-list" style="max-height:280px;overflow:auto"></div>`,
+        footer: `<button class="btn-ghost" data-qclose>关闭</button>`,
+        size: 'modal-lg'
+      });
+      qo.querySelector('[data-qclose]').addEventListener('click', qc);
+      function renderQ() {
+        const list = qo.querySelector('#qb-list');
+        const arr = d.peerQuestions || [];
+        list.innerHTML = arr.length ? arr.map(q => `
+          <div class="f2-item">
+            <span class="f2-item-mood">❓</span>
+            <div class="f2-item-main" style="flex:1"><div class="f2-item-text">${esc(q.text)}</div></div>
+            <button class="icon-btn f2-del" data-qdel="${q.id}"><i class="fas fa-trash-can"></i></button>
+          </div>`).join('') : '<p style="color:var(--c-text-faint);text-align:center;padding:14px 0">还没有问题，去上方添加吧</p>';
+        list.querySelectorAll('[data-qdel]').forEach(b => b.addEventListener('click', () => {
+          d.peerQuestions = (d.peerQuestions || []).filter(x => x.id !== b.dataset.qdel);
+          Core.State.save();
+          renderQ();
+        }));
+      }
+      qo.querySelector('#qb-add').addEventListener('click', () => {
+        const raw = qo.querySelector('#qb-input').value.trim();
+        if (!raw) { Core.Toast.show('先写点问题吧', 'error'); return; }
+        const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        if (!lines.length) { Core.Toast.show('没有有效内容', 'error'); return; }
+        d.peerQuestions = d.peerQuestions || [];
+        lines.forEach(text => d.peerQuestions.push({ id: Core.uid(), text }));
+        Core.State.save();
+        qo.querySelector('#qb-input').value = '';
+        renderQ();
+        Core.Toast.show(`已添加 ${lines.length} 条`, 'success');
+      });
+      renderQ();
+    });
+
+    /* ---- 通用多字段内容库管理（摸鱼库/查岗库共用） ---- */
+    function openPoolManager(title, pool, fields, after) {
+      // pool: {doings:[], moods:[], places:[]} 中的子集；fields: [{key,label,ph}]
+      const { overlay: po2, close: pc2 } = UI.modal({
+        title,
+        body: fields.map(f => `
+          <div style="margin-bottom:16px">
+            <label class="f2-label">${f.label}（<span data-pcount="${f.key}">${(pool[f.key] || []).length}</span> 条，每行一条批量添加）</label>
+            <textarea class="f2-textarea" rows="3" maxlength="500" data-pool-input="${f.key}" placeholder="${f.ph}"></textarea>
+            <button class="btn-primary" data-pool-add="${f.key}" style="width:100%;margin-top:6px;padding:7px"><i class="fas fa-plus"></i> 添加</button>
+            <div class="f2-list" data-pool-list="${f.key}" style="max-height:140px;overflow:auto;margin-top:8px"></div>
+          </div>`).join(''),
+        footer: `<button class="btn-ghost" data-pool-close>完成</button>`,
+        size: 'modal-lg'
+      });
+      po2.querySelector('[data-pool-close]').addEventListener('click', () => { pc2(); if (after) after(); });
+
+      function renderField(key) {
+        const list = po2.querySelector(`[data-pool-list="${key}"]`);
+        const arr = pool[key] || [];
+        po2.querySelector(`[data-pcount="${key}"]`).textContent = arr.length;
+        list.innerHTML = arr.length ? arr.map(q => `
+          <div class="f2-item" style="padding:6px 8px">
+            <div class="f2-item-main" style="flex:1"><div class="f2-item-text" style="font-size:13px">${esc(q.text)}</div></div>
+            <button class="icon-btn f2-del" data-pool-del="${key}:${q.id}"><i class="fas fa-trash-can"></i></button>
+          </div>`).join('') : '<p style="color:var(--c-text-faint);font-size:12px;padding:6px 0;text-align:center">还没添加</p>';
+        list.querySelectorAll('[data-pool-del]').forEach(b => b.addEventListener('click', () => {
+          const [k, id] = b.dataset.poolDel.split(':');
+          pool[k] = (pool[k] || []).filter(x => x.id !== id);
+          Core.State.save();
+          renderField(k);
+        }));
+      }
+      fields.forEach(f => {
+        renderField(f.key);
+        po2.querySelector(`[data-pool-add="${f.key}"]`).addEventListener('click', () => {
+          const raw = po2.querySelector(`[data-pool-input="${f.key}"]`).value.trim();
+          if (!raw) { Core.Toast.show('先写点内容吧', 'error'); return; }
+          const lines = raw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+          if (!lines.length) return;
+          pool[f.key] = pool[f.key] || [];
+          lines.forEach(text => pool[f.key].push({ id: Core.uid(), text }));
+          Core.State.save();
+          po2.querySelector(`[data-pool-input="${f.key}"]`).value = '';
+          renderField(f.key);
+          Core.Toast.show(`已添加 ${lines.length} 条`, 'success');
+        });
+      });
+    }
+
+    overlay.querySelector('#pf-fishbank').addEventListener('click', () => {
+      openPoolManager('🐟 摸鱼内容库', d.peerFishPool, [
+        { key: 'doings', label: 'TA 正在做', ph: '每行一条，如：假装在写方案' },
+        { key: 'moods', label: 'TA 心情', ph: '每行一条，如：😌 好惬意' }
+      ], () => openPeerFreqRefresh(overlay));
+    });
+    overlay.querySelector('#pf-cibank').addEventListener('click', () => {
+      openPoolManager('📍 查岗内容库', d.peerCheckinPool, [
+        { key: 'places', label: 'TA 地点', ph: '每行一条，如：家 / 公司 / 咖啡厅' },
+        { key: 'doings', label: 'TA 在做', ph: '每行一条，如：认真工作中 / 在看书' },
+        { key: 'moods', label: 'TA 心情', ph: '每行一条，如：😊 心情不错' }
+      ], () => openPeerFreqRefresh(overlay));
+    });
+
+    function openPeerFreqRefresh(ov) {
+      // 更新两个库卡片的计数文案
+      const fp = ov.querySelector('#pf-fishbank')?.closest('.f2-item')?.querySelector('.f2-item-text');
+      if (fp) fp.textContent = `摸鱼内容库（正在做 ${(d.peerFishPool?.doings || []).length} 条 · 心情 ${(d.peerFishPool?.moods || []).length} 条）`;
+      const cp = ov.querySelector('#pf-cibank')?.closest('.f2-item')?.querySelector('.f2-item-text');
+      if (cp) cp.textContent = `查岗内容库（地点 ${(d.peerCheckinPool?.places || []).length} · 在做 ${(d.peerCheckinPool?.doings || []).length} · 心情 ${(d.peerCheckinPool?.moods || []).length}）`;
+      const qp = ov.querySelector('#pf-qbank')?.closest('.f2-item')?.querySelector('.f2-item-text');
+      if (qp) qp.textContent = `我的提问库（${(d.peerQuestions || []).length} 条）`;
+    }
 
     const unitOpts = (sel) => FREQ_UNITS.map(u => `<option value="${u.k}" ${u.k === sel ? 'selected' : ''}>${u.name}</option>`).join('');
 
@@ -1181,6 +1339,13 @@ const Features4 = (() => {
   ];
   const PEER_DRAWING_SUBJECTS = ['一朵花', '一颗心', '一只猫', '一棵树', '一只鸟', '一个月亮', '一个蛋糕', '一栋小房子'];
 
+  // TA 主动摸鱼/查岗时的内容池
+  const PEER_FISH_DOINGS = ['假装在改 bug', '带薪喝水中', '盯着屏幕发呆', '偷偷刷短视频', '和同事聊天', '在工位上伸懒腰', '认真思考人生'];
+  const PEER_FISH_MOODS = ['😌 好惬意', '😎 摸得开心', '🥱 有点困', '😋 刚吃了零食', '🤫 嘘，小声点', '😴 想睡觉'];
+  const PEER_CHECKIN_PLACES = ['家', '公司', '学校', '咖啡厅', '公园', '图书馆', '健身房'];
+  const PEER_CHECKIN_DOINGS = ['认真工作中', '在看书学习', '刚健完身', '在喝咖啡发呆', '和朋友逛街', '在做饭', '躺着刷手机'];
+  const PEER_CHECKIN_MOODS = ['😊 心情不错', '😌 很放松', '🤩 状态超好', '😴 有点累', '😋 刚吃饱'];
+
   const INVITE_DEFS = {
     invListen:  { kind: 'listen',  icon: 'fa-music',           title: '邀请你一起听歌', desc: '我发现一首超好听的歌，要不要一起听？' },
     invWatch:   { kind: 'watch',   icon: 'fa-film',            title: '邀请你一起观影', desc: '今晚有空吗？想约你一起看个视频～' },
@@ -1227,8 +1392,54 @@ const Features4 = (() => {
       Core.State.addMessage(sid, msg);
       if (typeof Features8 !== 'undefined' && Features8.refreshNotes) Features8.refreshNotes();
     } else if (key === 'question') {
-      const text = pick(PEER_QUESTION_TEMPLATES);
+      // 优先用户自定义提问库；库空才回落内置
+      const mine = (d.peerQuestions || []).map(q => q.text).filter(Boolean);
+      const pool = mine.length ? mine : PEER_QUESTION_TEMPLATES;
+      const text = pick(pool);
       Core.State.addMessage(sid, { id: Core.uid(), from: peer, to: uid, type: 'text', text, time: now, status: 'delivered' });
+    } else if (key === 'peerFish') {
+      // TA 主动分享自己的摸鱼小计（仅从用户库挑，库空回落内置）
+      const myD = (d.peerFishPool?.doings || []).map(x => x.text).filter(Boolean);
+      const myM = (d.peerFishPool?.moods || []).map(x => x.text).filter(Boolean);
+      const doing = pick(myD.length ? myD : PEER_FISH_DOINGS);
+      const mood = pick(myM.length ? myM : PEER_FISH_MOODS);
+      Core.State.addMessage(sid, {
+        id: Core.uid(), from: peer, to: uid, type: 'card',
+        cardIcon: 'fa-fish', cardTitle: '🐟 TA的摸鱼小计',
+        lines: [`正在做：${doing}`, `心情：${mood}`, '要不要一起来摸鱼？'],
+        time: now, status: 'delivered'
+      });
+    } else if (key === 'peerCheckin') {
+      // TA 主动向你打卡（仅从用户库挑，库空回落内置）
+      const myP = (d.peerCheckinPool?.places || []).map(x => x.text).filter(Boolean);
+      const myD2 = (d.peerCheckinPool?.doings || []).map(x => x.text).filter(Boolean);
+      const myM2 = (d.peerCheckinPool?.moods || []).map(x => x.text).filter(Boolean);
+      const place = pick(myP.length ? myP : PEER_CHECKIN_PLACES);
+      const doing = pick(myD2.length ? myD2 : PEER_CHECKIN_DOINGS);
+      const mood = pick(myM2.length ? myM2 : PEER_CHECKIN_MOODS);
+      Core.State.addMessage(sid, {
+        id: Core.uid(), from: peer, to: uid, type: 'card',
+        cardIcon: 'fa-street-view', cardTitle: '📍 TA的查岗打卡',
+        lines: [`地点：${place}`, `在做：${doing}`, `心情：${mood}`, '我很好，别担心～'],
+        time: now, status: 'delivered'
+      });
+    } else if (key === 'redEnvelope') {
+      // TA 主动给你发红包（金额随机 1.00~66.66）
+      const amount = +(Math.random() * 65.66 + 1).toFixed(2);
+      const rpid = Core.uid();
+      Core.State.addMessage(sid, {
+        id: Core.uid(), from: peer, to: uid, type: 'redpacket',
+        rpid, title: '来自 TA 的心意红包', count: 1, amount, remaining: 1,
+        time: now, status: 'delivered'
+      });
+    } else if (key === 'peerVideo') {
+      // TA 主动发起视频通话邀请（邀请卡片，你可同意/拒绝）
+      Core.State.addMessage(sid, {
+        id: Core.uid(), from: peer, to: uid, type: 'invite',
+        inviteKind: 'videoCall', cardIcon: 'fa-video', cardTitle: '📹 TA 邀请你视频通话',
+        lines: ['要不要视频聊一会儿？'], invStatus: null,
+        time: now, status: 'delivered'
+      });
     } else if (key === 'drawing') {
       const subj = pick(PEER_DRAWING_SUBJECTS);
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="#fff"/><text x="100" y="100" font-size="14" text-anchor="middle" fill="#5b8cc7">${subj}</text><circle cx="100" cy="70" r="30" fill="none" stroke="#e8b8b8" stroke-width="3"/><path d="M70 120 Q100 80 130 120" fill="none" stroke="#b8d8f0" stroke-width="3"/></svg>`;
@@ -1274,6 +1485,12 @@ const Features4 = (() => {
         inviteKind: 'pomo', cardIcon: 'fa-stopwatch', cardTitle: '邀请你一起陪伴',
         lines: ['想和你一起专注/休息一会儿，开启陪伴模式吧～'], invStatus: null, time: now, status: 'delivered'
       });
+    } else if (key === 'moment') {
+      // TA 发朋友圈
+      if (typeof Features9 !== 'undefined' && Features9.postPeerMoment) Features9.postPeerMoment(peer);
+    } else if (key === 'momentReact') {
+      // TA 赞/评论我的朋友圈
+      if (typeof Features9 !== 'undefined' && Features9.reactMyMoment) Features9.reactMyMoment(peer);
     } else {
       touched = false;
     }
@@ -1333,6 +1550,7 @@ const Features4 = (() => {
       else if (k === 'game') Features6.openGames();
       else if (k === 'checkin') Features2.openCheckin();
       else if (k === 'pomo' && typeof Features8 !== 'undefined') Features8.openPomodoro();
+      else if (k === 'videoCall' && typeof Features5 !== 'undefined') Features5.openVideoCall();
     }
   }
 
