@@ -393,7 +393,11 @@ const Features6 = (() => {
       medium: ['钢琴','风筝','蝴蝶','彩虹','望远镜','宇航员','潜水艇','长城','吉他','火锅','机器人','滑板'],
       hard: ['量子物理','蒙娜丽莎','银河系','人工智能','丝绸之路','交响乐','拓扑学','光合作用','黑洞','元宇宙','哲学','基因编辑']
     };
-    const pool = WORDS[diff];
+    // 用户自定义词库优先；不足 4 个时用当前难度内置词补足选项
+    const customWords = (Core.State.data.drawGuessWords || []).map(w => w.trim()).filter(Boolean);
+    const pool = customWords.length ? customWords.concat(WORDS[diff].filter(w => !customWords.includes(w))) : WORDS[diff];
+    // 谜底优先取自用户自定义词；自定义词不足 4 个时选项用内置词补足
+    const secretPool = customWords.length ? customWords : WORDS[diff];
     const ROUNDS = 6;
     let round = 0, scoreMe = 0, scorePeer = 0, over = false;
     let secret = null, options = [], drawer = 'me', canvasCtx = null, drawing = false;
@@ -410,12 +414,31 @@ const Features6 = (() => {
         <canvas class="f6-canvas" id="dg-canvas" width="360" height="240"></canvas>
         <div class="f6-dg-opts" id="dg-opts"></div>
         <p style="text-align:center" id="dg-status"></p>`,
-      footer: `<button class="btn-ghost" id="dg-clear">清空画板</button><button class="btn-primary" data-close>关闭</button>`,
+      footer: `<button class="btn-ghost" id="dg-words">⚙️ 自定义词库${customWords.length ? '(' + customWords.length + ')' : ''}</button><button class="btn-ghost" id="dg-clear">清空画板</button><button class="btn-primary" data-close>关闭</button>`,
       size: 'modal-lg'
     });
     const $ = (s) => overlay.querySelector(s);
     $('[data-close]').addEventListener('click', close);
     $('#dg-clear').addEventListener('click', () => { clearCanvas(); });
+    $('#dg-words').addEventListener('click', () => {
+      const wm = UI.modal({
+        title: '⚙️ 你画我猜 · 自定义词库',
+        body: `
+          <p style="font-size:12px;color:var(--c-text-faint);margin-bottom:8px">每行一个词（也可用逗号分隔）。设置后游戏优先使用你的词；不足 4 个时用内置词补足选项。留空则恢复全内置词。</p>
+          <textarea class="f2-textarea" id="dgw-area" rows="10" placeholder="苹果&#10;独角兽&#10;深夜食堂&#10;…">${esc((Core.State.data.drawGuessWords || []).join('\n'))}</textarea>`,
+        footer: `<button class="btn-ghost" data-close>取消</button><button class="btn-primary" id="dgw-save">保存并应用</button>`,
+        size: 'modal-lg'
+      });
+      wm.overlay.querySelector('[data-close]').addEventListener('click', wm.close);
+      wm.overlay.querySelector('#dgw-save').addEventListener('click', () => {
+        const raw = wm.overlay.querySelector('#dgw-area').value;
+        const words = raw.split(/[\n,，、;；]/).map(w => w.trim()).filter(Boolean).slice(0, 200);
+        Core.State.data.drawGuessWords = words;
+        Core.State.save();
+        Core.Toast.show(words.length ? `已启用自定义词库（${words.length} 词），下一局生效` : '已清空，使用内置词库', 'success');
+        wm.close();
+      });
+    });
     const canvas = $('#dg-canvas');
     canvasCtx = canvas.getContext('2d');
     canvasCtx.lineCap = 'round'; canvasCtx.lineWidth = 3; canvasCtx.strokeStyle = '#3a4a6b';
@@ -433,7 +456,7 @@ const Features6 = (() => {
       if (round >= ROUNDS) return finish();
       round++; drawer = round % 2 === 1 ? 'me' : 'ai';
       clearCanvas();
-      secret = choice(pool);
+      secret = choice(secretPool);
       // 4 选项含 secret
       const others = pool.filter(w => w !== secret);
       const opt = [secret];

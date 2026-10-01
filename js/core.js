@@ -94,7 +94,28 @@ const Core = (() => {
     logout() { store.remove(KEYS.CURRENT); },
     current() { return store.get(KEYS.CURRENT); },
     getUser(username) { return store.get(KEYS.USERS, {})[username]; },
-    allUsers() { return store.get(KEYS.USERS, {}); }
+    allUsers() { return store.get(KEYS.USERS, {}); },
+    /* 免登录：无当前账号时自动创建/进入本地默认账号，不需要用户名密码 */
+    async ensureGuest() {
+      const users = store.get(KEYS.USERS, {});
+      let cur = store.get(KEYS.CURRENT);
+      if (cur && users[cur]) return users[cur];
+      const username = 'me';
+      if (!users[username]) {
+        users[username] = {
+          username, nickname: '我', pwdHash: await hash('siyu_guest'),
+          avatar: '', guest: true, createdAt: now()
+        };
+        store.set(KEYS.USERS, users);
+        store.set(KEYS.DATA(username), {
+          profile: { username, nickname: '我', avatar: '' },
+          contacts: [], groups: [], sessions: {}, messages: {},
+          diaries: [], letters: [], books: [], media: [], settings: { theme: 'morandi' }
+        });
+      }
+      store.set(KEYS.CURRENT, username);
+      return users[username];
+    }
   };
 
   /* ---- 状态 / 数据 ---- */
@@ -139,7 +160,10 @@ const Core = (() => {
       this.data.messages[sessionId].push(msg);
       const sess = this.data.sessions[sessionId];
       if (sess) {
-        sess.lastMsg = msg.type === 'text' ? msg.text : `[${msg.type}]`;
+        if (msg.type === 'text') sess.lastMsg = msg.text;
+        else if (msg.type === 'invite') sess.lastMsg = '[邀请] ' + (msg.cardTitle || '');
+        else if (msg.type === 'card') sess.lastMsg = msg.cardTitle ? `[卡片] ${msg.cardTitle}` : '[卡片]';
+        else sess.lastMsg = `[${msg.type}]`;
         sess.lastTime = msg.time;
         if (msg.from !== this.user.username) sess.unread = (sess.unread || 0) + 1;
       }
@@ -205,11 +229,10 @@ const Core = (() => {
       if (type === 'message' && payload.to === State.user?.username) {
         // 收到对方发来的消息
         const sid = State.getOrCreateSession(payload.from, 'private');
+        // 透传全部消息字段（quote / link / proposal / foodOrder / detail / url 等新类型）
         State.addMessage(sid, {
+          ...payload,
           id: uid(), from: payload.from, to: State.user.username,
-          type: payload.type, text: payload.text, time: payload.time,
-          cardIcon: payload.cardIcon, cardTitle: payload.cardTitle, lines: payload.lines,
-          question: payload.question, options: payload.options,
           status: 'delivered'
         });
         State.clearUnread(sid); // 模拟已送达

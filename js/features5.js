@@ -128,6 +128,10 @@ const Features5 = (() => {
             <button class="stk-del" data-stkdel="${s.id}" title="删除"><i class="fas fa-xmark"></i></button></div>`).join('')}
           <button class="stk-item stk-add" id="stk-add" title="上传表情包"><i class="fas fa-plus"></i></button>
         </div>`;
+        body.querySelectorAll('.stk-item img').forEach(im => im.addEventListener('error', () => {
+          const box = im.closest('.stk-item');
+          if (box) { box.classList.add('stk-fallback'); im.remove(); box.insertAdjacentHTML('beforeend', '<span class="stk-fb-emoji">🖼️</span>'); }
+        }));
       } else {
         body.innerHTML = `<div class="ep-grid km">${KAOMOJIS.map(k => `<span class="emoji-item km-item">${k}</span>`).join('')}</div>`;
       }
@@ -204,6 +208,14 @@ const Features5 = (() => {
   }
 
   /* ==================== 字卡 ==================== */
+  const CARD_KINDS = [
+    { k: 'reply',  icon: '💬', name: '回复卡', hint: 'TA 平时回复你时从这里选词' },
+    { k: 'diary',  icon: '📔', name: '日记卡', hint: 'TA 主动写日记分享给你时从这里选词' },
+    { k: 'note',   icon: '📝', name: '留言卡', hint: 'TA 给你留言时从这里选词' },
+    { k: 'letter', icon: '📨', name: '写信卡', hint: 'TA 给你写信时从这里选词' }
+  ];
+  const cardKind = (c) => (c && c.kind) || 'reply';
+
   function openCards() {
     const d = ensureData();
     const { overlay, close } = UI.modal({
@@ -218,36 +230,51 @@ const Features5 = (() => {
           <button class="f2-chip selectable" data-wcscope="pub">通用</button>
           <button class="f2-chip selectable" data-wcscope="peer">专属</button>
         </div>
+        <div class="f2-chip-row" id="wc-kind-chips"></div>
         <div class="f2-chip-row" id="wc-cat-chips"></div>
         <div class="f2-list" id="wc-list"></div>`,
       footer: `<button class="btn-ghost" data-close>关闭</button>`,
       size: 'modal-xl'
     });
     overlay.querySelector('[data-close]').addEventListener('click', close);
-    let scope = 'all', cat = '';
+    let kind = 'all', scope = 'all', cat = '';
 
-    const cats = () => [...new Set(d.wordCards.map(c => c.cat).filter(Boolean))];
+    const cats = () => [...new Set(d.wordCards.filter(c => kind === 'all' || cardKind(c) === kind).map(c => c.cat).filter(Boolean))];
 
     function render() {
+      const kindRow = overlay.querySelector('#wc-kind-chips');
+      const countOf = (k) => k === 'all' ? d.wordCards.length : d.wordCards.filter(c => cardKind(c) === k).length;
+      kindRow.innerHTML = [
+        `<button class="f2-chip selectable ${kind === 'all' ? 'selected' : ''}" data-wckind="all">全部 ${countOf('all')}</button>`,
+        ...CARD_KINDS.map(kd => `<button class="f2-chip selectable ${kind === kd.k ? 'selected' : ''}" data-wckind="${kd.k}">${kd.icon} ${kd.name} ${countOf(kd.k)}</button>`)
+      ].join('');
+      kindRow.querySelectorAll('[data-wckind]').forEach(b => b.addEventListener('click', () => {
+        kind = b.dataset.wckind; cat = ''; render();
+      }));
+
       const catRow = overlay.querySelector('#wc-cat-chips');
       catRow.innerHTML = [
         `<button class="f2-chip selectable ${cat === '' ? 'selected' : ''}" data-wccat="">全部分类</button>`,
         ...cats().map(c => `<button class="f2-chip selectable ${cat === c ? 'selected' : ''}" data-wccat="${esc(c)}">${esc(c)}</button>`),
-        ...(d.wordCards.some(c => !c.cat) ? [`<button class="f2-chip selectable ${cat === '__none' ? 'selected' : ''}" data-wccat="__none">未分类</button>`] : [])
+        ...(d.wordCards.some(c => (kind === 'all' || cardKind(c) === kind) && !c.cat) ? [`<button class="f2-chip selectable ${cat === '__none' ? 'selected' : ''}" data-wccat="__none">未分类</button>`] : [])
       ].join('');
 
       const list = overlay.querySelector('#wc-list');
       const items = d.wordCards.filter(c =>
+        (kind === 'all' || cardKind(c) === kind) &&
         (scope === 'all' || c.scope === scope) &&
         (cat === '' || (cat === '__none' ? !c.cat : c.cat === cat)));
+      const kindMeta = Object.fromEntries(CARD_KINDS.map(kd => [kd.k, kd]));
       list.innerHTML = items.length ? items.map(c => {
         const peerNames = (c.peers || []).map(peerDisplayName).join('、');
+        const kd = kindMeta[cardKind(c)] || kindMeta.reply;
         return `
         <div class="f2-item">
-          <span class="f2-item-mood">${c.scope === 'peer' ? '👤' : '🌐'}</span>
+          <span class="f2-item-mood">${kd.icon}</span>
           <div class="f2-item-main">
             <div class="f2-item-text">${esc(c.text)}</div>
             <div class="f2-item-sub">
+              <span class="wc-badge">${kd.icon} ${kd.name}</span>
               <span class="wc-badge ${c.cat ? '' : 'wc-badge-dim'}">${c.cat ? esc(c.cat) : '未分类'}</span>
               ${c.scope === 'peer'
                 ? `<span class="wc-badge">仅 ${esc(peerNames || '未选择人物')} 可用</span>`
@@ -258,7 +285,7 @@ const Features5 = (() => {
           <button class="icon-btn" data-wcedit="${c.id}" title="编辑"><i class="fas fa-pen"></i></button>
           <button class="icon-btn f2-del" data-wcdel="${c.id}" title="删除"><i class="fas fa-trash-can"></i></button>
         </div>`;
-      }).join('') : '<p style="color:var(--c-text-faint);text-align:center">还没有字卡，点击上方按钮添加吧</p>';
+      }).join('') : '<p style="color:var(--c-text-faint);text-align:center">这里还没有字卡，点击上方按钮添加吧</p>';
 
       list.querySelectorAll('[data-wcsend]').forEach(b => b.addEventListener('click', () => sendWordCard(d.wordCards.find(x => x.id === b.dataset.wcsend))));
       list.querySelectorAll('[data-wcedit]').forEach(b => b.addEventListener('click', () => editCard(b.dataset.wcedit, render)));
@@ -277,8 +304,8 @@ const Features5 = (() => {
       overlay.querySelectorAll('#wc-scope-chips .f2-chip').forEach(x => x.classList.toggle('selected', x === t));
       render();
     });
-    overlay.querySelector('#wc-add').addEventListener('click', () => editCard(null, render));
-    overlay.querySelector('#wc-batch').addEventListener('click', () => batchAdd(render));
+    overlay.querySelector('#wc-add').addEventListener('click', () => editCard(null, render, kind === 'all' ? 'reply' : kind));
+    overlay.querySelector('#wc-batch').addEventListener('click', () => batchAdd(render, kind === 'all' ? 'reply' : kind));
     render();
   }
 
@@ -289,12 +316,18 @@ const Features5 = (() => {
       || '<p style="color:var(--c-text-faint);font-size:12px">暂无其他用户，专属字卡需要先有聊天对象</p>';
   }
 
-  function editCard(id, onDone) {
+  function editCard(id, onDone, defaultKind = 'reply') {
     const d = ensureData();
-    const c = id ? d.wordCards.find(x => x.id === id) : { id: Core.uid(), text: '', cat: '', scope: 'pub', peers: [] };
+    const c = id ? d.wordCards.find(x => x.id === id) : { id: Core.uid(), text: '', cat: '', kind: defaultKind, scope: 'pub', peers: [] };
+    const curKind = cardKind(c);
     const em = UI.modal({
       title: id ? '编辑字卡' : '添加字卡',
       body: `
+        <label class="f2-label">字卡类型（TA 在什么场景用这张卡）</label>
+        <div class="f2-chip-row" id="wc-kindrow">
+          ${CARD_KINDS.map(kd => `<button type="button" class="f2-chip selectable ${curKind === kd.k ? 'selected' : ''}" data-wck="${kd.k}" title="${kd.hint}">${kd.icon} ${kd.name}</button>`).join('')}
+        </div>
+        <p class="wc-kind-hint" id="wc-kindhint"></p>
         <label class="f2-label">字卡内容</label>
         <textarea id="wc-text" class="f2-textarea" rows="3" placeholder="输入字卡内容，例如：晚安，做个好梦～">${esc(c.text)}</textarea>
         <label class="f2-label">分类</label>
@@ -302,8 +335,8 @@ const Features5 = (() => {
         <datalist id="wc-cat-list">${[...new Set(d.wordCards.map(x => x.cat).filter(Boolean))].map(x => `<option value="${esc(x)}">`).join('')}</datalist>
         <label class="f2-label">使用范围</label>
         <div class="f2-chip-row">
-          <button class="f2-chip selectable ${c.scope !== 'peer' ? 'selected' : ''}" data-wcr="pub">🌐 通用（所有会话可用）</button>
-          <button class="f2-chip selectable ${c.scope === 'peer' ? 'selected' : ''}" data-wcr="peer">👤 专属（勾选人物可用）</button>
+          <button type="button" class="f2-chip selectable ${c.scope !== 'peer' ? 'selected' : ''}" data-wcr="pub">🌐 通用（所有会话可用）</button>
+          <button type="button" class="f2-chip selectable ${c.scope === 'peer' ? 'selected' : ''}" data-wcr="peer">👤 专属（勾选人物可用）</button>
         </div>
         <div id="wc-peers-box" class="${c.scope === 'peer' ? '' : 'hidden'}">
           <label class="f2-label">勾选可使用该字卡的人物</label>
@@ -312,20 +345,29 @@ const Features5 = (() => {
       footer: `<button class="btn-ghost" data-close>取消</button><button class="btn-primary" id="wc-save">保存</button>`,
       size: 'modal-lg'
     });
+    let kindSel = curKind;
     let scope = c.scope || 'pub';
     const chips = em.overlay;
+    const kindHint = chips.querySelector('#wc-kindhint');
+    function paintKind() {
+      chips.querySelectorAll('[data-wck]').forEach(b => b.classList.toggle('selected', b.dataset.wck === kindSel));
+      kindHint.textContent = CARD_KINDS.find(kd => kd.k === kindSel)?.hint || '';
+    }
     function toggle() {
       chips.querySelector('[data-wcr="pub"]').classList.toggle('selected', scope === 'pub');
       chips.querySelector('[data-wcr="peer"]').classList.toggle('selected', scope === 'peer');
       chips.querySelector('#wc-peers-box').classList.toggle('hidden', scope !== 'peer');
     }
+    paintKind();
     em.overlay.querySelector('[data-close]').addEventListener('click', em.close);
+    em.overlay.querySelectorAll('[data-wck]').forEach(b => b.addEventListener('click', () => { kindSel = b.dataset.wck; paintKind(); }));
     em.overlay.querySelector('[data-wcr="pub"]').addEventListener('click', () => { scope = 'pub'; toggle(); });
     em.overlay.querySelector('[data-wcr="peer"]').addEventListener('click', () => { scope = 'peer'; toggle(); });
     em.overlay.querySelector('#wc-save').addEventListener('click', () => {
       const text = em.overlay.querySelector('#wc-text').value.trim();
       if (!text) { Core.Toast.show('请输入字卡内容', 'error'); return; }
       c.text = text;
+      c.kind = kindSel;
       c.cat = em.overlay.querySelector('#wc-cat').value.trim();
       c.scope = scope;
       if (scope === 'peer') {
@@ -342,11 +384,15 @@ const Features5 = (() => {
     });
   }
 
-  function batchAdd(onDone) {
+  function batchAdd(onDone, defaultKind = 'reply') {
     const d = ensureData();
     const bm = UI.modal({
       title: '批量添加字卡',
       body: `
+        <label class="f2-label">字卡类型（本批全部使用该类型）</label>
+        <div class="f2-chip-row" id="wcb-kindrow">
+          ${CARD_KINDS.map(kd => `<button type="button" class="f2-chip selectable ${defaultKind === kd.k ? 'selected' : ''}" data-wcbk="${kd.k}" title="${kd.hint}">${kd.icon} ${kd.name}</button>`).join('')}
+        </div>
         <label class="f2-label">每行一条字卡内容</label>
         <textarea id="wcb-text" class="f2-textarea" rows="7" placeholder="例如：&#10;早安，今天也要元气满满哦&#10;记得吃午饭呀&#10;晚安，好梦"></textarea>
         <label class="f2-label">统一分类（可留空）</label>
@@ -354,8 +400,8 @@ const Features5 = (() => {
         <datalist id="wcb-cat-list">${[...new Set(d.wordCards.map(x => x.cat).filter(Boolean))].map(x => `<option value="${esc(x)}">`).join('')}</datalist>
         <label class="f2-label">使用范围</label>
         <div class="f2-chip-row">
-          <button class="f2-chip selectable selected" data-wcr="pub">🌐 通用</button>
-          <button class="f2-chip selectable" data-wcr="peer">👤 专属（勾选人物）</button>
+          <button type="button" class="f2-chip selectable selected" data-wcr="pub">🌐 通用</button>
+          <button type="button" class="f2-chip selectable" data-wcr="peer">👤 专属（勾选人物）</button>
         </div>
         <div id="wcb-peers-box" class="hidden">
           <div class="wc-peer-list">${peerCheckboxList([])}</div>
@@ -363,8 +409,13 @@ const Features5 = (() => {
       footer: `<button class="btn-ghost" data-close>取消</button><button class="btn-primary" id="wcb-save">批量添加</button>`,
       size: 'modal-lg'
     });
+    let kindSel = defaultKind;
     let scope = 'pub';
     bm.overlay.querySelector('[data-close]').addEventListener('click', bm.close);
+    bm.overlay.querySelectorAll('[data-wcbk]').forEach(b => b.addEventListener('click', () => {
+      kindSel = b.dataset.wcbk;
+      bm.overlay.querySelectorAll('[data-wcbk]').forEach(x => x.classList.toggle('selected', x === b));
+    }));
     bm.overlay.querySelectorAll('[data-wcr]').forEach(b => b.addEventListener('click', () => {
       scope = b.dataset.wcr;
       bm.overlay.querySelectorAll('[data-wcr]').forEach(x => x.classList.toggle('selected', x === b));
@@ -379,7 +430,7 @@ const Features5 = (() => {
         if (!peers.length) { Core.Toast.show('请至少勾选一位人物', 'error'); return; }
       }
       const cat = bm.overlay.querySelector('#wcb-cat').value.trim();
-      lines.forEach(t => d.wordCards.unshift({ id: Core.uid(), text: t, cat, scope, peers }));
+      lines.forEach(t => d.wordCards.unshift({ id: Core.uid(), text: t, cat, kind: kindSel, scope, peers }));
       Core.State.save();
       bm.close();
       if (onDone) onDone();
@@ -401,6 +452,18 @@ const Features5 = (() => {
     }
     Messaging.sendMessage({ type: 'text', text: c.text });
     Core.Toast.show('字卡已发送', 'success');
+  }
+
+  /* 对方可回复使用的字卡内容池（公共 + 对该人物专属；仅限回复卡）；用户要求 AI 回复完全取自其添加的字卡 */
+  function cardsOfKind(kind, peer) {
+    const d = ensureData();
+    return d.wordCards
+      .filter(c => c && c.text && c.text.trim() && cardKind(c) === kind
+        && (c.scope !== 'peer' || (c.peers || []).includes(peer)))
+      .map(c => c.text);
+  }
+  function cardRepliesFor(peer) {
+    return cardsOfKind('reply', peer);
   }
 
   /* ==================== 视频通话 ==================== */
@@ -617,5 +680,5 @@ const Features5 = (() => {
     bind('btn-video', openVideoCall);
   }
 
-  return { init, openCards, openQuotes, openVideoCall, uploadSticker };
+  return { init, openCards, openQuotes, openVideoCall, uploadSticker, cardRepliesFor, cardsOfKind, CARD_KINDS };
 })();

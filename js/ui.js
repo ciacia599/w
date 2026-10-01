@@ -117,12 +117,38 @@ const UI = (() => {
           e.stopPropagation();
           const act = btn.dataset.action;
           if (act === 'recall') Messaging.recallMessage(sid, mid);
+          if (act === 'quote') Features7.startQuote(sid, mid);
           if (act === 'copy') {
             const m = msgs.find(x => x.id === mid);
             navigator.clipboard.writeText(m.text || '');
             Core.Toast.show('已复制', 'success');
           }
         });
+      });
+      // 日记/信件等卡片点开看全文
+      row.querySelectorAll('.msg-card[data-detail]').forEach(card => {
+        card.addEventListener('click', () => {
+          const m = msgs.find(x => x.id === mid);
+          if (m && m.detail) Features7.openDetail(m.detail);
+        });
+      });
+      // 头像/昵称提议卡：同意 / 拒绝（分开）
+      row.querySelectorAll('[data-prop]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Features7.respondProposal(sid, mid, btn.dataset.prop === 'accept');
+        });
+      });
+      // 点餐卡：接单 / 婉拒
+      row.querySelectorAll('[data-fo]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Features4.respondFoodOrder(sid, mid, btn.dataset.fo === 'accept');
+        });
+      });
+      // 图片点击放大
+      row.querySelectorAll('.msg-img').forEach(im => {
+        im.addEventListener('click', () => Features7.openImage(im.dataset.src || im.src));
       });
     });
 
@@ -145,6 +171,16 @@ const UI = (() => {
         Features.votePoll(sid, btn.dataset.poll, Number(btn.dataset.opt));
       });
     });
+
+    // 邀请卡片（对方主动邀请：接受/婉拒）
+    box.querySelectorAll('.msg-row').forEach(row => {
+      row.querySelectorAll('[data-inv]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Features4.respondInvite(sid, row.dataset.mid, btn.dataset.inv === 'accept');
+        });
+      });
+    });
   }
 
   function renderBubble(m, me) {
@@ -165,7 +201,7 @@ const UI = (() => {
         content = escapeHtml(m.text).replace(/@(\S+)/g, '<span style="color:var(--c-accent-deep);font-weight:500">@$1</span>');
         break;
       case 'image':
-        content = `<img class="msg-img" src="${m.url}" alt="图片" onclick="window.open('${m.url}')">`;
+        content = `<img class="msg-img" src="${m.url}" data-src="${m.url}" alt="图片" style="cursor:zoom-in">`;
         break;
       case 'file':
         content = `<a href="${m.url}" download="${m.name}" target="_blank" style="text-decoration:none;color:inherit">
@@ -210,12 +246,86 @@ const UI = (() => {
         break;
       }
       case 'card':
-        content = `<div class="msg-card">
+        content = `<div class="msg-card ${m.detail ? 'openable' : ''}" ${m.detail ? 'data-detail="1"' : ''}>
           ${m.cardIcon ? `<i class="fas ${m.cardIcon} msg-card-icon"></i>` : ''}
           ${m.cardTitle ? `<div class="msg-card-title">${escapeHtml(m.cardTitle)}</div>` : ''}
           ${(m.lines || []).map(l => `<div class="msg-card-line">${escapeHtml(l)}</div>`).join('')}
+          ${m.detail ? '<div class="msg-card-more"><i class="fas fa-book-open"></i> 点击查看全文</div>' : ''}
         </div>`;
         break;
+      case 'link': {
+        const p = m.platform || { icon: 'fa-link', name: '链接', color: '#8fa3c4' };
+        content = `<a class="msg-link-card" href="${escapeHtml(m.url)}" target="_blank" rel="noopener">
+          <span class="msg-link-icon" style="background:${p.color}"><i class="fas ${p.icon}"></i></span>
+          <span class="msg-link-main">
+            <span class="msg-link-title">${escapeHtml(m.title || p.name + '链接')}</span>
+            <span class="msg-link-host">${escapeHtml(m.host || m.url)}</span>
+          </span>
+          <i class="fas fa-arrow-up-right-from-square msg-link-go"></i>
+        </a>`;
+        break;
+      }
+      case 'proposal': {
+        const isAvatar = m.propKind === 'avatar';
+        const foot = m.propStatus === 'accepted'
+          ? '<div class="invite-foot ok"><i class="fas fa-check"></i> 你已同意，资料已更新</div>'
+          : m.propStatus === 'rejected'
+            ? '<div class="invite-foot no"><i class="fas fa-xmark"></i> 你已拒绝</div>'
+            : `<div class="invite-actions">
+                <button class="invite-btn accept" data-prop="accept"><i class="fas fa-check"></i> 同意</button>
+                <button class="invite-btn reject" data-prop="reject">拒绝</button>
+              </div>`;
+        const preview = isAvatar
+          ? `<img class="prop-avatar-img" src="${m.propValue}" alt="头像">`
+          : `<div class="prop-nick-text">${escapeHtml(m.propValue || '')}</div>`;
+        content = `<div class="msg-card proposal-card">
+          ${m.cardIcon ? `<i class="fas ${m.cardIcon} msg-card-icon"></i>` : ''}
+          ${m.cardTitle ? `<div class="msg-card-title">${escapeHtml(m.cardTitle)}</div>` : ''}
+          <div class="prop-preview ${isAvatar ? 'is-avatar' : 'is-nick'}">${preview}</div>
+          ${(m.lines || []).map(l => `<div class="msg-card-line">${escapeHtml(l)}</div>`).join('')}
+          ${foot}
+        </div>`;
+        break;
+      }
+      case 'foodOrder': {
+        const mine = isMe;
+        const foot = m.orderStatus === 'accepted'
+          ? `<div class="invite-foot ok"><i class="fas fa-check"></i> ${mine ? 'TA 已接单' : '你已接单'}</div>`
+          : m.orderStatus === 'rejected'
+            ? `<div class="invite-foot no"><i class="fas fa-xmark"></i> ${mine ? 'TA 婉拒了' : '你已婉拒'}</div>`
+            : mine
+              ? '<div class="invite-foot wait"><i class="far fa-clock"></i> 等待TA接单…</div>'
+              : `<div class="invite-actions">
+                  <button class="invite-btn accept" data-fo="accept"><i class="fas fa-utensils"></i> 接单</button>
+                  <button class="invite-btn reject" data-fo="reject">婉拒</button>
+                </div>`;
+        content = `<div class="msg-card food-card">
+          ${m.cardIcon ? `<i class="fas ${m.cardIcon} msg-card-icon"></i>` : ''}
+          ${m.cardTitle ? `<div class="msg-card-title">${escapeHtml(m.cardTitle)}</div>` : ''}
+          <div class="food-dish">🍽️ ${escapeHtml(m.dish || '')}</div>
+          ${(m.lines || []).slice(1).map(l => `<div class="msg-card-line">${escapeHtml(l)}</div>`).join('')}
+          ${foot}
+        </div>`;
+        break;
+      }
+      case 'invite': {
+        const st = m.invStatus;
+        const foot = st === 'accepted'
+          ? '<div class="invite-foot ok"><i class="fas fa-check"></i> 已接受邀请</div>'
+          : st === 'rejected'
+            ? '<div class="invite-foot no"><i class="fas fa-xmark"></i> 已婉拒</div>'
+            : `<div class="invite-actions">
+                <button class="invite-btn accept" data-inv="accept"><i class="fas fa-check"></i> 接受</button>
+                <button class="invite-btn reject" data-inv="reject">婉拒</button>
+              </div>`;
+        content = `<div class="msg-card invite-card">
+          ${m.cardIcon ? `<i class="fas ${m.cardIcon} msg-card-icon"></i>` : ''}
+          ${m.cardTitle ? `<div class="msg-card-title">${escapeHtml(m.cardTitle)}</div>` : ''}
+          ${(m.lines || []).map(l => `<div class="msg-card-line">${escapeHtml(l)}</div>`).join('')}
+          ${foot}
+        </div>`;
+        break;
+      }
       case 'system':
         return `<div class="recalled">${m.text}</div>`;
       default:
@@ -229,18 +339,21 @@ const UI = (() => {
         ${m.status === 'read' ? '<i class="fas fa-check-double read"></i>' : ''}
       </span>` : '';
 
-    const actions = isMe && !m.recalled ? `
+    const actions = `
       <div class="msg-actions">
+        <button data-action="quote"><i class="fas fa-reply"></i> 引用</button>
         <button data-action="copy"><i class="fas fa-copy"></i> 复制</button>
-        <button data-action="recall"><i class="fas fa-undo"></i> 撤回</button>
-      </div>` : `<div class="msg-actions"><button data-action="copy"><i class="fas fa-copy"></i> 复制</button></div>`;
+        ${isMe ? '<button data-action="recall"><i class="fas fa-undo"></i> 撤回</button>' : ''}
+      </div>`;
+
+    const quoteHtml = m.quote ? Features7.quoteHtml(m.quote) : '';
 
     return `
       <div class="msg-row ${side}" data-mid="${m.id}">
         <img class="avatar" src="${avatar}" alt="">
         <div class="bubble-wrap">
           ${!isMe && fromName ? `<div style="font-size:11px;color:var(--c-text-soft);margin-bottom:2px">${fromName}</div>` : ''}
-          <div class="bubble">${content}</div>
+          <div class="bubble">${quoteHtml}${content}</div>
           <div class="msg-meta">${fmtTime(m.time)} ${statusHtml}</div>
           ${actions}
         </div>

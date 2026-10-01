@@ -55,7 +55,7 @@ const Settings = (() => {
           <button class="btn-ghost" id="clear-data" style="flex:1;color:var(--c-red)"><i class="fas fa-trash"></i> 清空数据</button>
         </div>`,
       footer: `
-        <button class="btn-ghost" id="logout-btn" style="margin-right:auto;color:var(--c-red)"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+        <button class="btn-ghost" id="logout-btn" style="margin-right:auto;color:var(--c-red)"><i class="fas fa-right-to-bracket"></i> 切换账号</button>
         <button class="btn-primary" data-close>完成</button>`,
       size: 'modal-lg'
     });
@@ -82,8 +82,9 @@ const Settings = (() => {
       });
     });
 
-    // 退出登录
+    // 退出登录 / 切换账号（显式操作才显示登录页，平时进入免登录）
     overlay.querySelector('#logout-btn').addEventListener('click', () => {
+      Core.store.set('siyu_choose_account', 1);
       Core.Auth.logout();
       location.reload();
     });

@@ -55,6 +55,8 @@ const Messaging = (() => {
       time: Core.now(),
       status: 'sending'
     };
+    // 引用回复（若回复条处于激活状态）
+    if (typeof Features7 !== 'undefined') { const q = Features7.takeQuote(); if (q) msg.quote = q; }
 
     Core.State.addMessage(sid, msg);
     input.value = '';
@@ -76,7 +78,7 @@ const Messaging = (() => {
       // 跨标签页发送给对方
       if (s.type === 'private') {
         Core.Sync.send('message', {
-          from: msg.from, to: msg.to, type: msg.type, text: msg.text, time: msg.time
+          from: msg.from, to: msg.to, type: msg.type, text: msg.text, time: msg.time, quote: msg.quote
         });
       }
 
@@ -98,15 +100,18 @@ const Messaging = (() => {
 
     setTimeout(() => {
       UI.showTyping(peer, false);
-      const replies = [
-        '嗯嗯，我在听～', '好的呀', '哈哈哈有意思', '真的吗？', '我也这么觉得',
-        '抱抱你 🤗', '今天过得怎么样？', '想你了', '早点休息哦', '收到！',
-        '哇塞！', '这个想法不错', '我有点不懂，能再说一遍吗？', '好嘞～'
-      ];
-      let reply = replies[Math.floor(Math.random() * replies.length)];
-      if (Core.Probability.roll('emojiUse')) {
-        const emojis = ['😊', '🥰', '😆', '💕', '✨', '🌸', '☕', '🌙'];
-        reply += ' ' + emojis[Math.floor(Math.random() * emojis.length)];
+      // 用户要求：对方回复完全使用「我添加的字卡」内容；没有可用字卡时才用兜底短句
+      let reply;
+      const cards = Features5.cardRepliesFor ? Features5.cardRepliesFor(peer) : [];
+      if (cards.length) {
+        reply = cards[Math.floor(Math.random() * cards.length)];
+      } else {
+        const replies = [
+          '嗯嗯，我在听～', '好的呀', '哈哈哈有意思', '真的吗？', '我也这么觉得',
+          '抱抱你 🤗', '今天过得怎么样？', '想你了', '早点休息哦', '收到！',
+          '哇塞！', '这个想法不错', '我有点不懂，能再说一遍吗？', '好嘞～'
+        ];
+        reply = replies[Math.floor(Math.random() * replies.length)];
       }
 
       const msg = {
@@ -130,7 +135,7 @@ const Messaging = (() => {
       UI.renderSessions(document.getElementById('session-search').value);
 
       // 对方主动内容（日记/写信/提问/画画），频率可在「对方主动频率」中调节
-      if (window.Features4) Features4.peerProactiveTrigger(sid, peer);
+      Features4.peerProactiveTrigger(sid, peer);
 
       // 通知已读
       if (Core.Probability.roll('readReceipt')) {
@@ -189,9 +194,21 @@ const Messaging = (() => {
       status: 'sent',
       ...payload
     };
+    // 图片/表情包/颜文字/卡片等也支持带引用
+    if (!msg.quote && typeof Features7 !== 'undefined') { const q = Features7.takeQuote(); if (q) msg.quote = q; }
+    // 链接卡片归一化（调用方未带平台信息时自动识别）
+    if (msg.type === 'link' && msg.url) {
+      if (!msg.platform && typeof Features7 !== 'undefined' && Features7.detectPlatform) {
+        msg.platform = Features7.detectPlatform(msg.url);
+      }
+      if (!msg.host) { try { msg.host = new URL(msg.url).hostname.replace(/^www\./, ''); } catch (e) { msg.host = msg.url; } }
+      if (!msg.title) msg.title = (msg.platform && msg.platform.name ? msg.platform.name : '网页') + '分享';
+    }
     Core.State.addMessage(sid, msg);
     UI.renderMessages(sid);
     UI.renderSessions(document.getElementById('session-search').value);
+    // 跨标签页同步（私聊）
+    if (s.type === 'private') Core.Sync.send('message', msg);
     return msg;
   }
 

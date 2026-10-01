@@ -190,46 +190,75 @@ const Features3 = (() => {
 
   function openProfile() {
     const user = Core.State.user;
+    const d = Core.State.data;
+    d.avatarPool = Array.isArray(d.avatarPool) ? d.avatarPool : [];
+    d.nickPool = Array.isArray(d.nickPool) ? d.nickPool : [];
     const { overlay, close } = UI.modal({
       title: '✨ 我的头像与昵称',
       body: `
         <div style="text-align:center;margin-bottom:10px">
-          <img id="pf-preview" src="${esc(user.avatar || UI.AVATARS[0])}" class="f3-pf-avatar">
+          ${user.avatar
+            ? `<img id="pf-preview" src="${esc(user.avatar)}" class="f3-pf-avatar">`
+            : '<div id="pf-preview" class="f3-pf-avatar pf-avatar-placeholder"><i class="fas fa-user"></i></div>'}
         </div>
-        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px">
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px;flex-wrap:wrap">
           <input type="file" id="pf-file" accept="image/*" hidden>
-          <button class="btn-ghost" id="pf-upload" style="padding:6px 14px;font-size:13px"><i class="fas fa-upload"></i> 上传头像</button>
+          <button class="btn-primary" id="pf-upload" style="padding:6px 14px;font-size:13px"><i class="fas fa-upload"></i> 上传头像图片</button>
+          <button class="btn-ghost" id="pf-hub" style="padding:6px 14px;font-size:13px"><i class="fas fa-images"></i> 头像昵称库</button>
         </div>
-        <label class="f2-label">选择头像</label>
+        <label class="f2-label">从我的头像库选择（${d.avatarPool.length}）</label>
         <div class="f3-pf-avatars" id="pf-avatars">
-          ${UI.AVATARS.map(a => `<img class="f3-pf-opt ${a === user.avatar ? 'selected' : ''}" src="${a}" data-a="${a}">`).join('')}
+          ${d.avatarPool.length
+            ? d.avatarPool.map(a => `<img class="f3-pf-opt ${a.url === user.avatar ? 'selected' : ''}" src="${esc(a.url)}" data-a="${esc(a.url)}">`).join('')
+            : '<span style="color:var(--c-text-faint);font-size:12px">头像库为空，点上方按钮上传</span>'}
         </div>
         <label class="f2-label">昵称</label>
         <input type="text" id="pf-nick" value="${esc(user.nickname || '')}" maxlength="12" placeholder="给自己起个昵称">
-        <label class="f2-label">挑一个灵感昵称</label>
+        <label class="f2-label">从昵称库选择（${d.nickPool.length}）</label>
         <div class="f2-chip-row">
-          ${NICKNAME_IDEAS.map(n => `<button class="f2-chip selectable" data-n="${esc(n)}">${esc(n)}</button>`).join('')}
+          ${d.nickPool.map(n => `<button class="f2-chip selectable" data-n="${esc(n.name)}">${esc(n.name)}</button>`).join('')
+            || '<span style="color:var(--c-text-faint);font-size:12px">昵称库为空，可直接在上方输入或去「头像昵称库」添加</span>'}
         </div>`,
       footer: `<button class="btn-ghost" data-close>取消</button><button class="btn-primary" id="pf-save"><i class="fas fa-check"></i> 保存</button>`,
       size: 'modal-lg'
     });
     overlay.querySelector('[data-close]').addEventListener('click', close);
 
-    let avatar = user.avatar || UI.AVATARS[0];
-    const preview = overlay.querySelector('#pf-preview');
+    let avatar = user.avatar || '';
+    const setPreview = (src) => {
+      let el = overlay.querySelector('#pf-preview');
+      if (!src) return;
+      if (el.tagName === 'DIV') {
+        const img = document.createElement('img');
+        img.id = 'pf-preview'; img.className = 'f3-pf-avatar';
+        el.replaceWith(img);
+        el = img;
+      }
+      el.src = src;
+    };
     const pick = (src) => {
-      avatar = src;
-      preview.src = src;
+      avatar = src || '';
+      if (src) setPreview(src);
       overlay.querySelectorAll('.f3-pf-opt').forEach(x => x.classList.toggle('selected', x.dataset.a === src));
     };
     overlay.querySelectorAll('.f3-pf-opt').forEach(x => x.addEventListener('click', () => pick(x.dataset.a)));
+    overlay.querySelector('#pf-hub').addEventListener('click', () => { close(); Features7.openAvatarHub(); });
     overlay.querySelector('#pf-upload').addEventListener('click', () => overlay.querySelector('#pf-file').click());
-    overlay.querySelector('#pf-file').addEventListener('change', (e) => {
+    overlay.querySelector('#pf-file').addEventListener('change', async (e) => {
       const f = e.target.files[0];
       if (!f) return;
-      const r = new FileReader();
-      r.onload = () => { pick(r.result); overlay.querySelectorAll('.f3-pf-opt').forEach(x => x.classList.remove('selected')); };
-      r.readAsDataURL(f);
+      if (f.size > 8 * 1024 * 1024) { Core.Toast.show('图片不能超过 8MB', 'error'); return; }
+      try {
+        const url = await Features7.fileToDataURL(f, 256);
+        d.avatarPool.push({ id: Core.uid(), name: f.name.replace(/\.[^.]+$/, ''), url });
+        Core.State.save();
+        // 就地刷新头像库网格
+        const box = overlay.querySelector('#pf-avatars');
+        box.innerHTML = d.avatarPool.map(a => `<img class="f3-pf-opt ${a.url === url ? 'selected' : ''}" src="${esc(a.url)}" data-a="${esc(a.url)}">`).join('');
+        box.querySelectorAll('.f3-pf-opt').forEach(x => x.addEventListener('click', () => pick(x.dataset.a)));
+        pick(url);
+      } catch (err) { Core.Toast.show('图片读取失败', 'error'); }
+      e.target.value = '';
     });
     overlay.querySelectorAll('[data-n]').forEach(b => b.addEventListener('click', () => {
       overlay.querySelector('#pf-nick').value = b.dataset.n;
@@ -239,15 +268,18 @@ const Features3 = (() => {
       if (!nick) { Core.Toast.show('昵称不能为空', 'error'); return; }
       // 1) 更新 users 表
       const users = Core.Auth.allUsers();
-      if (users[user.username]) { users[user.username].nickname = nick; users[user.username].avatar = avatar; }
+      if (users[user.username]) { users[user.username].nickname = nick; if (avatar) users[user.username].avatar = avatar; }
       Core.store.set(Core.KEYS.USERS, users);
       // 2) 更新运行态与数据
-      user.nickname = nick; user.avatar = avatar;
-      Core.State.data.profile = Object.assign(Core.State.data.profile || {}, { nickname: nick, avatar });
+      user.nickname = nick; if (avatar) user.avatar = avatar;
+      Core.State.data.profile = Object.assign(Core.State.data.profile || {}, { nickname: nick });
+      if (avatar) Core.State.data.profile.avatar = avatar;
       Core.State.save();
       // 3) 更新侧栏
-      document.getElementById('current-avatar').src = avatar;
+      const avEl = document.getElementById('current-avatar');
+      if (avEl) avEl.src = avatar || avEl.src;
       document.getElementById('current-nickname').textContent = nick;
+      UI.refresh();
       Core.Toast.show('资料已更新', 'success');
       close();
     });
