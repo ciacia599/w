@@ -923,7 +923,6 @@ const Features3 = (() => {
           <button class="f3-sys-item" data-sys="recharge"><i class="fas fa-coins"></i><span>领取零花钱</span><em>金币 +1000</em></button>
           <button class="f3-sys-item" data-sys="goldmodify"><i class="fas fa-coins"></i><span>修改金币</span><em>自定义金币数额</em></button>
           <button class="f3-sys-item danger" data-sys="clear"><i class="fas fa-trash"></i><span>清空数据</span><em>不可恢复，谨慎操作</em></button>
-          <button class="f3-sys-item danger" data-sys="logout"><i class="fas fa-sign-out-alt"></i><span>退出登录</span><em>回到登录页</em></button>
         </div>
         <div class="f2-divider"></div>
         <p style="font-size:12px;color:var(--c-text-faint);line-height:1.8">
@@ -956,9 +955,6 @@ const Features3 = (() => {
           Core.Toast.show('数据已清空', 'success');
           close();
         }
-      }
-      else if (act === 'logout') {
-        if (confirm('确定退出登录吗？')) { Core.Auth.logout(); location.reload(); }
       }
     }));
   }

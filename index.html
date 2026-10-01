@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-<link rel="stylesheet" href="css/style.css?v=20260930h">
+<link rel="stylesheet" href="css/style.css?v=20261001d">
 </head>
 <body>
 
@@ -20,61 +20,8 @@
   <div class="bg-blob blob-3"></div>
 </div>
 
-<!-- ============ 登录/注册 ============ -->
-<div id="auth-screen" class="auth-screen">
-  <div class="glass-card auth-card">
-    <div class="auth-logo">
-      <i class="fas fa-feather"></i>
-    </div>
-    <h1 class="auth-title">私语</h1>
-    <p class="auth-subtitle">一个温柔的私人聊天空间</p>
-
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="login">登录</button>
-      <button class="auth-tab" data-tab="register">注册</button>
-    </div>
-
-    <div class="auth-form" id="form-login">
-      <div class="field">
-        <i class="fas fa-user field-icon"></i>
-        <input type="text" id="login-username" placeholder="用户名" autocomplete="off">
-      </div>
-      <div class="field">
-        <i class="fas fa-lock field-icon"></i>
-        <input type="password" id="login-password" placeholder="密码">
-      </div>
-      <button class="btn-primary btn-block" id="btn-login">
-        <i class="fas fa-sign-in-alt"></i> 登录
-      </button>
-      <p class="auth-hint">首次使用请先注册 · 数据仅存于本机</p>
-    </div>
-
-    <div class="auth-form hidden" id="form-register">
-      <div class="field">
-        <i class="fas fa-user field-icon"></i>
-        <input type="text" id="reg-username" placeholder="设置用户名" autocomplete="off">
-      </div>
-      <div class="field">
-        <i class="fas fa-smile field-icon"></i>
-        <input type="text" id="reg-nickname" placeholder="昵称" autocomplete="off">
-      </div>
-      <div class="field">
-        <i class="fas fa-lock field-icon"></i>
-        <input type="password" id="reg-password" placeholder="设置密码">
-      </div>
-      <div class="field avatar-picker">
-        <span class="field-label">选择头像</span>
-        <div class="avatar-options" id="avatar-options"></div>
-      </div>
-      <button class="btn-primary btn-block" id="btn-register">
-        <i class="fas fa-user-plus"></i> 注册并进入
-      </button>
-    </div>
-  </div>
-</div>
-
 <!-- ============ 主应用 ============ -->
-<div id="app" class="app hidden">
+<div id="app" class="app">
   <!-- 侧栏 -->
   <aside class="sidebar glass-panel">
     <div class="sidebar-header">
@@ -148,6 +95,8 @@
           <button class="tool-btn" id="btn-diary" title="日记"><i class="fas fa-book"></i></button>
           <button class="tool-btn" id="btn-letter" title="写信"><i class="fas fa-envelope"></i></button>
           <button class="tool-btn" id="btn-note" title="留言"><i class="fas fa-note-sticky"></i></button>
+          <button class="tool-btn" id="btn-pomodoro" title="番茄钟"><i class="fas fa-stopwatch"></i></button>
+          <button class="tool-btn" id="btn-memo" title="备忘录"><i class="fas fa-bell"></i></button>
           <button class="tool-btn" id="btn-game" title="游戏"><i class="fas fa-gamepad"></i></button>
           <button class="tool-btn" id="btn-listen" title="一起听歌"><i class="fas fa-music"></i></button>
           <button class="tool-btn" id="btn-watch" title="一起观影"><i class="fas fa-film"></i></button>
@@ -165,16 +114,9 @@
           <button class="tool-btn" id="btn-shop" title="商城"><i class="fas fa-store"></i></button>
           <span class="tool-divider"></span>
           <button class="tool-btn" id="btn-wheel" title="幸运转盘"><i class="fas fa-arrows-spin"></i></button>
-          <button class="tool-btn" id="btn-manifest" title="显化愿望"><i class="fas fa-sun"></i></button>
-          <button class="tool-btn" id="btn-oc" title="OC设定"><i class="fas fa-id-badge"></i></button>
           <button class="tool-btn" id="btn-kitchen" title="厨房"><i class="fas fa-utensils"></i></button>
-          <button class="tool-btn" id="btn-shift" title="现实转移"><i class="fas fa-galaxy"></i></button>
           <button class="tool-btn" id="btn-draw" title="画画"><i class="fas fa-paintbrush"></i></button>
-          <button class="tool-btn" id="btn-cards" title="字卡"><i class="fas fa-clone"></i></button>
-          <button class="tool-btn" id="btn-quote" title="格言"><i class="fas fa-quote-right"></i></button>
           <button class="tool-btn" id="btn-inspiration" title="灵感"><i class="fas fa-lightbulb"></i></button>
-          <button class="tool-btn" id="btn-peer" title="对方主动频率"><i class="fas fa-heart-pulse"></i></button>
-          <button class="tool-btn" id="btn-system" title="系统"><i class="fas fa-toolbox"></i></button>
         </div>
         <div class="input-row">
           <textarea id="message-input" rows="1" placeholder="输入消息... (Enter 发送 Shift+Enter 换行)"></textarea>
@@ -191,20 +133,21 @@
 <!-- ============ 提示容器 ============ -->
 <div id="toast-container"></div>
 
-<script src="js/core.js?v=20260930h"></script>
-<script src="js/ui.js?v=20260930h"></script>
-<script src="js/messaging.js?v=20260930h"></script>
-<script src="js/features.js?v=20260930h"></script>
-<script src="js/extras.js?v=20260930h"></script>
-<script src="js/group.js?v=20260930h"></script>
-<script src="js/settings.js?v=20260930h"></script>
-<script src="js/features2.js?v=20260930h"></script>
-<script src="js/features3.js?v=20260930h"></script>
-<script src="js/features4.js?v=20260930h"></script>
-<script src="js/features5.js?v=20260930h"></script>
-<script src="js/features6.js?v=20260930h"></script>
-<script src="js/features7.js?v=20260930h"></script>
-<script src="js/features8.js?v=20260930h"></script>
-<script src="js/app.js?v=20260930h"></script>
+<script src="js/core.js?v=20261001d"></script>
+<script src="js/ui.js?v=20261001d"></script>
+<script src="js/messaging.js?v=20261001d"></script>
+<script src="js/features.js?v=20261001d"></script>
+<script src="js/extras.js?v=20261001d"></script>
+<script src="js/group.js?v=20261001d"></script>
+<script src="js/settings.js?v=20261001d"></script>
+<script src="js/features2.js?v=20261001d"></script>
+<script src="js/features3.js?v=20261001d"></script>
+<script src="js/features4.js?v=20261001d"></script>
+<script src="js/features5.js?v=20261001d"></script>
+<script src="js/features6.js?v=20261001d"></script>
+<script src="js/features7.js?v=20261001d"></script>
+<script src="js/features8.js?v=20261001d"></script>
+<script src="js/features9.js?v=20261001d"></script>
+<script src="js/app.js?v=20261001d"></script>
 </body>
 </html>

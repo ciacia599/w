@@ -11,9 +11,11 @@ const Features4 = (() => {
       diary: 'normal', letter: 'normal', note: 'leisure', question: 'normal', drawing: 'off',
       invListen: 'leisure', invWatch: 'leisure', invRead: 'off',
       invGame: 'leisure', invAsk: 'leisure', invCheckin: 'off',
-      orderFood: 'off', propAvatar: 'off', propNickname: 'off', mediaCtl: 'off'
+      orderFood: 'off', propAvatar: 'off', propNickname: 'off', mediaCtl: 'off',
+      msg: 'normal', invPomo: 'off'
     };
     d.peerFreq = Object.assign({}, pfDefaults, d.peerFreq || {});
+    d.peerMsgCount = d.peerMsgCount || { min: 1, max: 3 }; // 每次主动发消息条数
     d.drawings = d.drawings || [];
     initShiftData(d);
     return d;
@@ -1001,7 +1003,9 @@ const Features4 = (() => {
     { k: 'orderFood', icon: 'fa-utensils', name: '对方向你点餐', desc: 'TA在聊天里向你点餐，你可以接单或婉拒（厨房·点餐）' },
     { k: 'propAvatar', icon: 'fa-image', name: '提议换头像', desc: 'TA从你的头像库挑头像提议给你换，你可同意/拒绝' },
     { k: 'propNickname', icon: 'fa-signature', name: '提议换昵称', desc: 'TA从你的昵称库挑昵称提议给你换，与头像分开' },
-    { k: 'mediaCtl', icon: 'fa-sliders', name: '媒体同步互动', desc: '一起听歌/观影/读书面板打开时，TA发消息并控制播放/翻页' }
+    { k: 'mediaCtl', icon: 'fa-sliders', name: '媒体同步互动', desc: '一起听歌/观影/读书面板打开时，TA发消息并控制播放/翻页' },
+    { k: 'msg', icon: 'fa-comment-dots', name: '主动发消息', desc: 'TA在回复你时额外主动发1~N条消息（条数可在下方设置）' },
+    { k: 'invPomo', icon: 'fa-stopwatch', name: '邀请陪伴', desc: 'TA主动邀请你开启番茄钟陪伴模式，你可同意/拒绝' }
   ];
 
   function openPeerFreq() {
@@ -1010,11 +1014,38 @@ const Features4 = (() => {
       title: '💞 对方主动频率',
       body: `
         <p style="font-size:13px;color:var(--c-text-soft);margin-bottom:12px">设置对方主动发起各内容的频率。<b>回复触发</b>：TA 回复你时按概率主动；<b>定时</b>：聊天中按你设定的时间间隔（可精确到秒，也可按小时）随机主动发起。</p>
-        <div id="pf-list"></div>`,
+        <div id="pf-list"></div>
+        <div class="f2-item" style="margin-top:14px;flex-direction:column;align-items:stretch;border-top:1px dashed var(--c-border);padding-top:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="f2-item-mood"><i class="fas fa-comment-dots"></i></span>
+            <div class="f2-item-main" style="flex:1">
+              <div class="f2-item-text">主动发消息条数</div>
+              <div class="f2-item-sub">TA 每次主动发消息时，连续发送几条（仅对「主动发消息」有效）</div>
+            </div>
+          </div>
+          <div class="pf-count-row">
+            <span>最少</span>
+            <input type="number" min="1" max="10" value="${d.peerMsgCount.min}" id="pf-min" style="width:60px">
+            <span>条，最多</span>
+            <input type="number" min="1" max="10" value="${d.peerMsgCount.max}" id="pf-max" style="width:60px">
+            <span>条</span>
+            <button class="btn-primary" id="pf-count-save" style="margin-left:auto;padding:6px 14px;font-size:13px">保存</button>
+          </div>
+        </div>`,
       footer: `<button class="btn-ghost" data-close>关闭</button>`,
       size: 'modal-lg'
     });
     overlay.querySelector('[data-close]').addEventListener('click', close);
+    // 条数设置保存
+    overlay.querySelector('#pf-count-save').addEventListener('click', () => {
+      const mn = Math.max(1, Math.min(10, parseInt(overlay.querySelector('#pf-min').value) || 1));
+      const mx = Math.max(1, Math.min(10, parseInt(overlay.querySelector('#pf-max').value) || 1));
+      d.peerMsgCount = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
+      Core.State.save();
+      overlay.querySelector('#pf-min').value = d.peerMsgCount.min;
+      overlay.querySelector('#pf-max').value = d.peerMsgCount.max;
+      Core.Toast.show('条数设置已保存', 'success');
+    });
 
     const unitOpts = (sel) => FREQ_UNITS.map(u => `<option value="${u.k}" ${u.k === sel ? 'selected' : ''}>${u.name}</option>`).join('');
 
@@ -1223,6 +1254,26 @@ const Features4 = (() => {
         inviteKind: def.kind, cardIcon: def.icon, cardTitle: def.title,
         lines: [def.desc], invStatus: null, time: now, status: 'delivered'
       });
+    } else if (key === 'msg') {
+      // 主动发消息：按条数设置连续发多条
+      const cnt = d.peerMsgCount || { min: 1, max: 3 };
+      const n = Math.max(1, Math.min(10, Math.floor(Math.random() * (cnt.max - cnt.min + 1)) + cnt.min));
+      const pool = (typeof Features5 !== 'undefined' && Features5.cardRepliesFor) ? Features5.cardRepliesFor(peer) : [];
+      const fallback = ['嗯嗯', '在呢', '哈哈', '这样啊', '挺好的', '想你了', '抱抱', '加油哦', '晚安', '早安'];
+      for (let i = 0; i < n; i++) {
+        const text = pool.length ? pick(pool) : pick(fallback);
+        Core.State.addMessage(sid, {
+          id: Core.uid(), from: peer, to: uid, type: 'text', text,
+          time: Core.now() + i, status: 'delivered'
+        });
+      }
+    } else if (key === 'invPomo') {
+      // 邀请陪伴：番茄钟陪伴模式邀请
+      Core.State.addMessage(sid, {
+        id: Core.uid(), from: peer, to: uid, type: 'invite',
+        inviteKind: 'pomo', cardIcon: 'fa-stopwatch', cardTitle: '邀请你一起陪伴',
+        lines: ['想和你一起专注/休息一会儿，开启陪伴模式吧～'], invStatus: null, time: now, status: 'delivered'
+      });
     } else {
       touched = false;
     }
@@ -1281,6 +1332,7 @@ const Features4 = (() => {
       else if (k === 'read') document.getElementById('btn-read')?.click();
       else if (k === 'game') Features6.openGames();
       else if (k === 'checkin') Features2.openCheckin();
+      else if (k === 'pomo' && typeof Features8 !== 'undefined') Features8.openPomodoro();
     }
   }
 

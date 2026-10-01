@@ -4,62 +4,14 @@
   const theme = Core.store.get(Core.KEYS.THEME, 'morandi');
   document.documentElement.setAttribute('data-theme', theme);
 
-  /* ---- 登录态检查（免登录：无账号自动进入默认本地账号） ---- */
-  const chooseAccount = Core.store.get('siyu_choose_account');
-  const currentUser = Core.Auth.current();
-  if (chooseAccount) {
-    Core.store.remove('siyu_choose_account'); // 仅本次显示登录页
-  } else if (currentUser) {
-    enterApp(currentUser);
-  } else {
-    Core.Auth.ensureGuest().then(u => enterApp(u.username));
-  }
-
-  /* ---- 认证 Tab 切换 ---- */
-  UI.initAvatarPicker();
-  document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const t = tab.dataset.tab;
-      document.getElementById('form-login').classList.toggle('hidden', t !== 'login');
-      document.getElementById('form-register').classList.toggle('hidden', t !== 'register');
-    });
-  });
-
-  /* ---- 登录 ---- */
-  document.getElementById('btn-login').addEventListener('click', async () => {
-    const u = document.getElementById('login-username').value.trim();
-    const p = document.getElementById('login-password').value;
-    if (!u || !p) { Core.Toast.show('请输入用户名和密码', 'error'); return; }
-    try {
-      await Core.Auth.login(u, p);
-      enterApp(u);
-    } catch (e) { Core.Toast.show(e.message, 'error'); }
-  });
-
-  /* ---- 注册 ---- */
-  document.getElementById('btn-register').addEventListener('click', async () => {
-    const u = document.getElementById('reg-username').value.trim();
-    const n = document.getElementById('reg-nickname').value.trim();
-    const p = document.getElementById('reg-password').value;
-    const avatar = document.querySelector('.avatar-opt.selected')?.dataset.avatar || UI.AVATARS[0];
-    if (!u || !n || !p) { Core.Toast.show('请填写完整信息', 'error'); return; }
-    if (p.length < 4) { Core.Toast.show('密码至少4位', 'error'); return; }
-    try {
-      await Core.Auth.register(u, n, p, avatar);
-      await Core.Auth.login(u, p);
-      enterApp(u);
-    } catch (e) { Core.Toast.show(e.message, 'error'); }
-  });
+  /* ---- 完全免登录直接进入 ---- */
+  Core.Auth.ensureGuest().then(u => enterApp(u.username));
 
   /* ---- 进入应用 ---- */
   function enterApp(username) {
     Core.State.load(username);
     document.getElementById('current-avatar').src = Core.State.user.avatar || UI.AVATARS[0];
     document.getElementById('current-nickname').textContent = Core.State.user.nickname;
-    document.getElementById('auth-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
 
     Core.Sync.init();
     Core.Sync.flushOffline();
@@ -73,6 +25,7 @@
     Features6.init();
     Features7.init();
     if (typeof Features8 !== 'undefined') Features8.init();
+    if (typeof Features9 !== 'undefined') Features9.init();
     Extras.init();
     Group.init();
     Settings.init();
@@ -151,24 +104,56 @@
   function showSpaces() {
     const list = document.getElementById('session-list');
     const d = Core.State.data;
+    const secStyle = 'padding:10px 8px;color:var(--c-text-soft);font-size:13px;margin-top:4px';
+    const iconStyle = 'background:var(--c-bubble-me);border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center';
+    const iconColor = 'color:var(--c-accent-deep)';
+
+    const spaces = [
+      { key:'diary',  name:'日记', icon:'fa-book', preview:`${d.diaries?.length||0} 篇日记` },
+      { key:'letter', name:'信件', icon:'fa-envelope', preview:`${d.letters?.length||0} 封信` },
+      { key:'books',  name:'书库', icon:'fa-book-open', preview:`${d.books?.length||0} 本书` },
+      { key:'shift',  name:'现实转移', icon:'fa-galaxy', preview:'世界转移中心' },
+      { key:'oc',     name:'OC设定', icon:'fa-id-badge', preview:'我的角色设定' },
+      { key:'manifest',name:'显化愿望', icon:'fa-sun', preview:'显化与感恩' },
+      { key:'cards',  name:'字卡', icon:'fa-clone', preview:`${d.wordCards?.length||0} 张字卡` },
+      { key:'quote',  name:'格言', icon:'fa-quote-right', preview:`${d.quotes?.length||0} 条格言` },
+      { key:'peer',   name:'对方主动频率', icon:'fa-heart-pulse', preview:'调整对方主动行为' },
+      { key:'system', name:'系统', icon:'fa-toolbox', preview:'数据与系统功能' },
+      { key:'settings', name:'提醒设置', icon:'fa-bell', preview:'通知/电话/保活开关' },
+      { key:'anniv',  name:'纪念日', icon:'fa-calendar-heart', preview:`${d.anniversaries?.length||0} 个纪念日` },
+      { key:'pomodoro', name:'番茄钟', icon:'fa-stopwatch', preview:'专注与陪伴' },
+      { key:'memo',   name:'备忘录', icon:'fa-bell', preview:`${d.memos?.filter(m=>!m.done)?.length||0} 个待办` },
+    ];
+
     list.innerHTML = `
       <div style="padding:10px 8px;color:var(--c-text-soft);font-size:13px">我的空间</div>
-      <div class="session-item" data-space="diary">
-        <div class="avatar-wrap" style="background:var(--c-bubble-me);border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center"><i class="fas fa-book" style="color:var(--c-accent-deep)"></i></div>
-        <div class="session-info"><div class="session-name">日记</div><div class="session-preview">${d.diaries?.length || 0} 篇日记</div></div>
-      </div>
-      <div class="session-item" data-space="letter">
-        <div class="avatar-wrap" style="background:var(--c-bubble-me);border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center"><i class="fas fa-envelope" style="color:var(--c-accent-deep)"></i></div>
-        <div class="session-info"><div class="session-name">信件</div><div class="session-preview">${d.letters?.length || 0} 封信</div></div>
-      </div>
-      <div class="session-item" data-space="books">
-        <div class="avatar-wrap" style="background:var(--c-bubble-me);border-radius:12px;width:44px;height:44px;display:flex;align-items:center;justify-content:center"><i class="fas fa-book-open" style="color:var(--c-accent-deep)"></i></div>
-        <div class="session-info"><div class="session-name">书库</div><div class="session-preview">${d.books?.length || 0} 本书</div></div>
-      </div>`;
-    list.querySelector('[data-space="diary"]').addEventListener('click', () => Extras.init || document.getElementById('btn-diary').click());
-    list.querySelector('[data-space="diary"]').addEventListener('click', () => document.getElementById('btn-diary').click());
-    list.querySelector('[data-space="letter"]').addEventListener('click', () => document.getElementById('btn-letter').click());
-    list.querySelector('[data-space="books"]').addEventListener('click', () => document.getElementById('btn-read').click());
+      ${spaces.map(s => `
+      <div class="session-item" data-space="${s.key}">
+        <div class="avatar-wrap" style="${iconStyle}"><i class="fas ${s.icon}" style="${iconColor}"></i></div>
+        <div class="session-info"><div class="session-name">${s.name}</div><div class="session-preview">${s.preview}</div></div>
+      </div>`).join('')}`;
+
+    // 通用绑定：优先调用对应 Features 的 open 函数，其次回退到点击原按钮
+    const binds = {
+      diary:    () => { try { document.getElementById('btn-diary').click(); } catch(e) {} },
+      letter:   () => { try { document.getElementById('btn-letter').click(); } catch(e) {} },
+      books:    () => { try { document.getElementById('btn-read').click(); } catch(e) {} },
+      shift:    () => { if (typeof Features4 !== 'undefined' && Features4.openRealityShift) Features4.openRealityShift(); else Core.Toast.show('功能加载中…','error'); },
+      oc:       () => { if (typeof Features3 !== 'undefined' && Features3.openOC) Features3.openOC(); else Core.Toast.show('功能加载中…','error'); },
+      manifest: () => { if (typeof Features3 !== 'undefined' && Features3.openManifest) Features3.openManifest(); else Core.Toast.show('功能加载中…','error'); },
+      cards:    () => { if (typeof Features5 !== 'undefined' && Features5.openCards) Features5.openCards(); else Core.Toast.show('功能加载中…','error'); },
+      quote:    () => { if (typeof Features5 !== 'undefined' && Features5.openQuotes) Features5.openQuotes(); else Core.Toast.show('功能加载中…','error'); },
+      peer:     () => { if (typeof Features4 !== 'undefined' && Features4.openPeerFreq) Features4.openPeerFreq(); else Core.Toast.show('功能加载中…','error'); },
+      system:   () => { if (typeof Features3 !== 'undefined' && Features3.openSystem) Features3.openSystem(); else Core.Toast.show('功能加载中…','error'); },
+      settings: () => { if (typeof Features9 !== 'undefined' && Features9.openSettings) Features9.openSettings(); else Core.Toast.show('功能加载中…','error'); },
+      anniv:    () => { if (typeof Features8 !== 'undefined' && Features8.openAnniversaries) Features8.openAnniversaries(); else Core.Toast.show('功能加载中…','error'); },
+      pomodoro: () => { if (typeof Features8 !== 'undefined' && Features8.openPomodoro) Features8.openPomodoro(); else Core.Toast.show('功能加载中…','error'); },
+      memo:     () => { if (typeof Features8 !== 'undefined' && Features8.openMemos) Features8.openMemos(); else Core.Toast.show('功能加载中…','error'); },
+    };
+    list.querySelectorAll('[data-space]').forEach(el => {
+      const key = el.dataset.space;
+      if (binds[key]) el.addEventListener('click', binds[key]);
+    });
   }
 
   /* ---- 发起私聊 ---- */
